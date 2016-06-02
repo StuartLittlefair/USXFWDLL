@@ -1,18 +1,14 @@
-#ifdef WIN32
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-#include "hidapi.h"
+#include "usxfwdll.h"
 
+#ifndef MAX_STR
 #define MAX_STR 255
+#endif
+#ifndef DELAY_MS
 #define DELAY_MS 2
+#endif
 
-// VendorID and ProductID for USX FW
-unsigned short VID = 0x922;
-unsigned short PID = 0x7234;
+unsigned short VID = 0x1278;
+unsigned short PID = 0x0920;
 
 void sleep(int sleepMS)
 {
@@ -29,16 +25,20 @@ int initialise()
     return hid_init();
 }
 
-int finalize()
+int finalise()
 {
     // finalize hidapi library
     return hid_exit();
 }
 
-hid_device* get_handle()
+hid_device* open_device()
 {
     // open FW device and get handle for read/write
     return hid_open(VID, PID, NULL);
+}
+
+void close_device(hid_device* handle){
+    hid_close(handle);
 }
 
 int wait_and_read(hid_device* handle, unsigned char* buf)
@@ -53,7 +53,7 @@ int wait_and_read(hid_device* handle, unsigned char* buf)
     }
 }
 
-int request_filter(int filter_num)
+int request_filter(hid_device* handle, int filter_num)
 {
     /* Send a command to set the current filter.
     
@@ -61,39 +61,17 @@ int request_filter(int filter_num)
     */
     int res;
     unsigned char buf[2];
-    hid_device *handle;
-    
-    res = initialise();
-    if (res > 1){
-        return res;
-    }
-    
-    handle = get_handle();
-    if (!handle){
-        return 1;
-    }
-    
-    buf[0] = 0x0;
-    buf[1] = filter_num;
+    buf[0] = filter_num;
+    buf[1] = 0x0;
     res = hid_write(handle, buf, 2);
-    if (res > 1){
+    if (res != 2){
        return res;
     }
     res = wait_and_read(handle, buf);
-    if (res >1 ){
-        return res;
-    }
-    
-    // Print out the returned buffer.
-    int i;
-	for (i = 0; i < 4; i++)
-		printf("buf[%d]: %d\n", i, buf[i]);
-    
-    res = finalize();
     return res;
 }
 
-int check_curr_filter()
+int check_curr_filter(hid_device* handle)
 {
     /* Request the current filter number from the filter wheel.a
     
@@ -101,21 +79,11 @@ int check_curr_filter()
     */
     int res;
     unsigned char buf[2];
-    hid_device *handle;
-    
-    res = initialise();
-    handle = get_handle();
 
     buf[0] = 0x0;
     buf[1] = 0x0;
     res = hid_write(handle, buf, 2);
     wait_and_read(handle, buf);
-    
-    // Print out the returned buffer.
-    int i;
-	for (i = 0; i < 4; i++)
-		printf("buf[%d]: %d\n", i, buf[i]);
-    
-    res = finalize();
-    return (int)buf[1];
+    return (int)buf[0];
 }
+
